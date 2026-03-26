@@ -1,0 +1,64 @@
+##############################################################################
+# api-gateway-deployment.yaml
+# Deploys the API Gateway on GKE with a LoadBalancer Service (external IP).
+##############################################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: ngsim
+  labels:
+    app: api-gateway
+    component: api-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: gcr.io/YOUR_PROJECT_ID/ngsim-gateway:latest
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: ngsim-config
+          resources:
+            requests:
+              cpu:    "250m"
+              memory: "256Mi"
+            limits:
+              cpu:    "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+# LoadBalancer exposes the gateway externally (gets a public IP on GKE)
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway-service
+  namespace: ngsim
+spec:
+  selector:
+    app: api-gateway
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+  type: LoadBalancer

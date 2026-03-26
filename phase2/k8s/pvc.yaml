@@ -1,0 +1,17 @@
+##############################################################################
+# pvc.yaml
+# PersistentVolumeClaim for shared data storage between services.
+# On GKE this provisions a GCP Persistent Disk automatically.
+##############################################################################
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ngsim-data-pvc
+  namespace: ngsim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard-rwo    # GKE standard storage class
+  resources:
+    requests:
+      storage: 10Gi

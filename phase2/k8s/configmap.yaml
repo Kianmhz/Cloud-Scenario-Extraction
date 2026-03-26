@@ -1,0 +1,31 @@
+##############################################################################
+# configmap.yaml
+# Stores shared non-secret configuration used by all services.
+# Secrets (GCS keys, BQ credentials) should use Kubernetes Secrets instead.
+##############################################################################
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ngsim-config
+  namespace: ngsim
+data:
+  # Service discovery URLs (services communicate within the cluster)
+  INGESTION_SERVICE_URL:  "http://ingestion-service:8001"
+  PROCESSING_SERVICE_URL: "http://processing-service:8002"
+  LABELING_SERVICE_URL:   "http://labeling-service:8003"
+  STORAGE_SERVICE_URL:    "http://storage-service:8004"
+
+  # Storage configuration
+  STORAGE_MODE:  "csv"           # csv | bigquery | both
+  OUTPUT_DIR:    "/data/outputs"
+  BQ_DATASET:    "ngsim_scenarios"
+  BQ_TABLE:      "scenario_samples"
+
+  # Processing configuration
+  MAX_WORKERS:             "4"
+  USE_PARALLEL_PROCESSING: "false"
+  REQUEST_TIMEOUT:         "600"
+
+  # GCS configuration (update with your bucket name)
+  USE_GCS:    "true"
+  GCS_BUCKET: "your-gcs-bucket-name"

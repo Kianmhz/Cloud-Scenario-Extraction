@@ -1,0 +1,70 @@
+##############################################################################
+# ingestion-deployment.yaml
+# Deploys the Ingestion Service on GKE.
+##############################################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingestion
+  namespace: ngsim
+  labels:
+    app: ingestion
+    component: ingestion-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ingestion
+  template:
+    metadata:
+      labels:
+        app: ingestion
+    spec:
+      containers:
+        - name: ingestion
+          image: gcr.io/YOUR_PROJECT_ID/ngsim-ingestion:latest
+          ports:
+            - containerPort: 8001
+          envFrom:
+            - configMapRef:
+                name: ngsim-config
+          volumeMounts:
+            - name: data-volume
+              mountPath: /data
+          resources:
+            requests:
+              cpu:    "250m"
+              memory: "256Mi"
+            limits:
+              cpu:    "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: data-volume
+          persistentVolumeClaim:
+            claimName: ngsim-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingestion-service
+  namespace: ngsim
+spec:
+  selector:
+    app: ingestion
+  ports:
+    - protocol: TCP
+      port: 8001
+      targetPort: 8001
+  type: ClusterIP

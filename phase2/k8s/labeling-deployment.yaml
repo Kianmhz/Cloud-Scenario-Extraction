@@ -1,0 +1,61 @@
+##############################################################################
+# labeling-deployment.yaml
+# Deploys the Labeling Service on GKE.
+# Lightweight service — no large data dependencies.
+##############################################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: labeling
+  namespace: ngsim
+  labels:
+    app: labeling
+    component: labeling-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: labeling
+  template:
+    metadata:
+      labels:
+        app: labeling
+    spec:
+      containers:
+        - name: labeling
+          image: gcr.io/YOUR_PROJECT_ID/ngsim-labeling:latest
+          ports:
+            - containerPort: 8003
+          resources:
+            requests:
+              cpu:    "100m"
+              memory: "128Mi"
+            limits:
+              cpu:    "250m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: labeling-service
+  namespace: ngsim
+spec:
+  selector:
+    app: labeling
+  ports:
+    - protocol: TCP
+      port: 8003
+      targetPort: 8003
+  type: ClusterIP

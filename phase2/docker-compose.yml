@@ -1,0 +1,160 @@
+##############################################################################
+# docker-compose.yml
+# -------------------
+# Local development and testing environment for the NGSIM Phase 2
+# microservices system.
+#
+# Usage
+# -----
+#   docker compose up --build          # start all services
+#   docker compose up --build gateway  # start only the gateway
+#   docker compose down                # stop all services
+#
+# Pipeline test (after services are running)
+# ------------------------------------------
+#   curl -X POST http://localhost:8000/pipeline/run \
+#        -F "file=@data/trajectories-0750am-0805am.csv"
+#
+# Query extracted scenarios
+# -------------------------
+#   curl "http://localhost:8000/scenarios?scenario_type=car_following&limit=5"
+#
+# Aggregate health check
+# ----------------------
+#   curl http://localhost:8000/services/health
+#
+# Aggregate metrics (bonus)
+# -------------------------
+#   curl http://localhost:8000/metrics
+##############################################################################
+
+version: "3.9"
+
+# Shared volume: all services that read/write data mount this
+volumes:
+  ngsim_data:
+    driver: local
+
+networks:
+  ngsim_net:
+    driver: bridge
+
+services:
+
+  # ── Ingestion Service ──────────────────────────────────────────────────────
+  ingestion:
+    build:
+      context: .
+      dockerfile: ingestion_service/Dockerfile
+    container_name: ngsim-ingestion
+    ports:
+      - "8001:8001"
+    networks:
+      - ngsim_net
+    volumes:
+      - ngsim_data:/data
+    environment:
+      DATA_DIR:  /data/uploads
+      USE_GCS:   "false"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 15s
+      timeout:  5s
+      retries:  3
+    restart: unless-stopped
+
+  # ── Processing Service ─────────────────────────────────────────────────────
+  processing:
+    build:
+      context: .
+      dockerfile: processing_service/Dockerfile
+    container_name: ngsim-processing
+    ports:
+      - "8002:8002"
+    networks:
+      - ngsim_net
+    volumes:
+      - ngsim_data:/data
+    environment:
+      MAX_WORKERS: "4"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 15s
+      timeout:  5s
+      retries:  3
+    restart: unless-stopped
+
+  # ── Labeling Service ───────────────────────────────────────────────────────
+  labeling:
+    build:
+      context: .
+      dockerfile: labeling_service/Dockerfile
+    container_name: ngsim-labeling
+    ports:
+      - "8003:8003"
+    networks:
+      - ngsim_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 15s
+      timeout:  5s
+      retries:  3
+    restart: unless-stopped
+
+  # ── Storage Service ────────────────────────────────────────────────────────
+  storage:
+    build:
+      context: .
+      dockerfile: storage_service/Dockerfile
+    container_name: ngsim-storage
+    ports:
+      - "8004:8004"
+    networks:
+      - ngsim_net
+    volumes:
+      - ngsim_data:/data
+    environment:
+      OUTPUT_DIR:   /data/outputs
+      STORAGE_MODE: csv         # change to 'bigquery' or 'both' for cloud
+      BQ_PROJECT:   ""
+      BQ_DATASET:   ngsim_scenarios
+      BQ_TABLE:     scenario_samples
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 15s
+      timeout:  5s
+      retries:  3
+    restart: unless-stopped
+
+  # ── API Gateway ────────────────────────────────────────────────────────────
+  gateway:
+    build:
+      context: .
+      dockerfile: api_gateway/Dockerfile
+    container_name: ngsim-gateway
+    ports:
+      - "8000:8000"
+    networks:
+      - ngsim_net
+    depends_on:
+      ingestion:
+        condition: service_healthy
+      processing:
+        condition: service_healthy
+      labeling:
+        condition: service_healthy
+      storage:
+        condition: service_healthy
+    environment:
+      INGESTION_SERVICE_URL:  http://ingestion:8001
+      PROCESSING_SERVICE_URL: http://processing:8002
+      LABELING_SERVICE_URL:   http://labeling:8003
+      STORAGE_SERVICE_URL:    http://storage:8004
+      REQUEST_TIMEOUT:        "600"
+      USE_PARALLEL_PROCESSING: "false"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout:  5s
+      retries:  3
+    restart: unless-stopped

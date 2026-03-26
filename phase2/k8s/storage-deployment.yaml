@@ -1,0 +1,73 @@
+##############################################################################
+# storage-deployment.yaml
+# Deploys the Storage Service on GKE.
+# Mounts the shared PVC and connects to BigQuery via Workload Identity.
+##############################################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: storage
+  namespace: ngsim
+  labels:
+    app: storage
+    component: storage-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: storage
+  template:
+    metadata:
+      labels:
+        app: storage
+    spec:
+      # Workload Identity for BigQuery access (no key files needed on GKE)
+      serviceAccountName: ngsim-workload-sa
+      containers:
+        - name: storage
+          image: gcr.io/YOUR_PROJECT_ID/ngsim-storage:latest
+          ports:
+            - containerPort: 8004
+          envFrom:
+            - configMapRef:
+                name: ngsim-config
+          volumeMounts:
+            - name: data-volume
+              mountPath: /data
+          resources:
+            requests:
+              cpu:    "250m"
+              memory: "512Mi"
+            limits:
+              cpu:    "500m"
+              memory: "1Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8004
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8004
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: data-volume
+          persistentVolumeClaim:
+            claimName: ngsim-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: storage-service
+  namespace: ngsim
+spec:
+  selector:
+    app: storage
+  ports:
+    - protocol: TCP
+      port: 8004
+      targetPort: 8004
+  type: ClusterIP

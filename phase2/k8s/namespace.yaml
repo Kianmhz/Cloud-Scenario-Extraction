@@ -1,0 +1,11 @@
+##############################################################################
+# namespace.yaml
+# Creates the Kubernetes namespace for all NGSIM Phase 2 resources.
+##############################################################################
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ngsim
+  labels:
+    project: ngsim-scenario-extraction
+    phase: "2"

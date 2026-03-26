@@ -1,0 +1,71 @@
+##############################################################################
+# processing-deployment.yaml
+# Deploys the Processing Service on GKE.
+# Higher CPU/memory limits due to data-intensive scenario detection.
+##############################################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: processing
+  namespace: ngsim
+  labels:
+    app: processing
+    component: processing-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: processing
+  template:
+    metadata:
+      labels:
+        app: processing
+    spec:
+      containers:
+        - name: processing
+          image: gcr.io/YOUR_PROJECT_ID/ngsim-processing:latest
+          ports:
+            - containerPort: 8002
+          envFrom:
+            - configMapRef:
+                name: ngsim-config
+          volumeMounts:
+            - name: data-volume
+              mountPath: /data
+          resources:
+            requests:
+              cpu:    "1000m"
+              memory: "2Gi"
+            limits:
+              cpu:    "2000m"
+              memory: "4Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8002
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8002
+            initialDelaySeconds: 10
+            periodSeconds: 15
+      volumes:
+        - name: data-volume
+          persistentVolumeClaim:
+            claimName: ngsim-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: processing-service
+  namespace: ngsim
+spec:
+  selector:
+    app: processing
+  ports:
+    - protocol: TCP
+      port: 8002
+      targetPort: 8002
+  type: ClusterIP
