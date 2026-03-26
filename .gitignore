@@ -1,0 +1,46 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data – large raw files (too big for git)
+data/*.csv
+phase1/data/*.csv
+
+# Output – generated at runtime, not source-controlled
+output/scenario_samples.csv
+output/run_log.txt
+output/pipeline_output.txt
+output/plots/*.png
+phase1/output/scenario_samples.csv
+phase1/output/run_log.txt
+phase1/output/pipeline_output.txt
+phase1/output/plots/*.png
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# GCP credentials (never commit these)
+*.json
+service-account*.json
+gcp-key*.json
