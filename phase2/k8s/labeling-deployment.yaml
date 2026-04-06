@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: labeling
-          image: gcr.io/YOUR_PROJECT_ID/ngsim-labeling:latest
+          image: REGION-docker.pkg.dev/YOUR_PROJECT_ID/ngsim/ngsim-labeling:latest
           ports:
             - containerPort: 8003
           resources:

@@ -168,46 +168,78 @@ Aggregated metrics from all five services.
 ## Cloud Deployment (Google Kubernetes Engine)
 
 ### Prerequisites
-- GCP project with GKE, GCS, and BigQuery APIs enabled
+- GCP project with GKE and Artifact Registry APIs enabled
 - `gcloud` CLI authenticated
 - `kubectl` configured for your cluster
+- Docker available (Cloud Shell recommended)
 
 ### Steps
 
-**1. Build and push images**
+**1. Create a GKE cluster**
 ```bash
-# Set your project ID
 export PROJECT_ID=your-gcp-project-id
+export REGION=your-region   # e.g. northamerica-northeast2
 
-docker build -t gcr.io/$PROJECT_ID/ngsim-ingestion  -f ingestion_service/Dockerfile  .
-docker build -t gcr.io/$PROJECT_ID/ngsim-processing -f processing_service/Dockerfile .
-docker build -t gcr.io/$PROJECT_ID/ngsim-labeling   -f labeling_service/Dockerfile   .
-docker build -t gcr.io/$PROJECT_ID/ngsim-storage    -f storage_service/Dockerfile    .
-docker build -t gcr.io/$PROJECT_ID/ngsim-gateway    -f api_gateway/Dockerfile        .
+gcloud container clusters create ngsim-cluster \
+  --region=$REGION \
+  --machine-type=e2-small \
+  --num-nodes=1
 
-docker push gcr.io/$PROJECT_ID/ngsim-ingestion
-docker push gcr.io/$PROJECT_ID/ngsim-processing
-docker push gcr.io/$PROJECT_ID/ngsim-labeling
-docker push gcr.io/$PROJECT_ID/ngsim-storage
-docker push gcr.io/$PROJECT_ID/ngsim-gateway
+gcloud container clusters get-credentials ngsim-cluster --region=$REGION
 ```
 
-**2. Update image references**
+**2. Create Artifact Registry repository and push images**
+```bash
+# Enable Artifact Registry API
+gcloud services enable artifactregistry.googleapis.com
 
-Replace `YOUR_PROJECT_ID` in all `k8s/*-deployment.yaml` files with your actual project ID.
+# Create Docker repository
+gcloud artifacts repositories create ngsim \
+  --repository-format=docker \
+  --location=$REGION
 
-**3. Update configuration**
+# Configure Docker auth
+gcloud auth configure-docker ${REGION}-docker.pkg.dev
 
-Edit `k8s/configmap.yaml`:
-- Set `GCS_BUCKET` to your bucket name
-- Set `STORAGE_MODE` to `bigquery` or `both` for cloud storage
-- Set `BQ_PROJECT` in the storage deployment
+# Set image registry prefix
+export AR=${REGION}-docker.pkg.dev/$PROJECT_ID/ngsim
 
-**4. Deploy to GKE**
+# Build and push all images
+docker build -t $AR/ngsim-ingestion:latest  -f ingestion_service/Dockerfile  .
+docker build -t $AR/ngsim-processing:latest -f processing_service/Dockerfile .
+docker build -t $AR/ngsim-labeling:latest   -f labeling_service/Dockerfile   .
+docker build -t $AR/ngsim-storage:latest    -f storage_service/Dockerfile    .
+docker build -t $AR/ngsim-gateway:latest    -f api_gateway/Dockerfile        .
+
+docker push $AR/ngsim-ingestion:latest
+docker push $AR/ngsim-processing:latest
+docker push $AR/ngsim-labeling:latest
+docker push $AR/ngsim-storage:latest
+docker push $AR/ngsim-gateway:latest
+```
+
+**3. Update image references**
+
+Replace `REGION` and `YOUR_PROJECT_ID` in all `k8s/*-deployment.yaml` files with your actual region and project ID:
+```bash
+sed -i "s|REGION|${REGION}|g" k8s/*-deployment.yaml
+sed -i "s|YOUR_PROJECT_ID|${PROJECT_ID}|g" k8s/*-deployment.yaml
+```
+
+**4. Grant Artifact Registry access to GKE nodes**
+```bash
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+  --role="roles/artifactregistry.reader"
+```
+
+**5. Deploy to GKE**
 ```bash
 kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/configmap.yaml
 kubectl apply -f k8s/pvc.yaml
+kubectl create serviceaccount ngsim-workload-sa -n ngsim
 kubectl apply -f k8s/ingestion-deployment.yaml
 kubectl apply -f k8s/processing-deployment.yaml
 kubectl apply -f k8s/labeling-deployment.yaml
@@ -218,12 +250,15 @@ kubectl apply -f k8s/api-gateway-deployment.yaml
 kubectl get service api-gateway-service -n ngsim
 ```
 
-**5. Run the pipeline**
+**6. Run the pipeline**
 ```bash
-# Replace EXTERNAL_IP with the LoadBalancer IP from step 4
+# Replace EXTERNAL_IP with the LoadBalancer IP from step 5
 curl -X POST http://EXTERNAL_IP/pipeline/run \
      -F "file=@trajectories-0750am-0805am.csv"
 ```
+
+> **Note:** Resource requests are tuned for `e2-small` nodes (2 vCPU, 2GB RAM).
+> For larger CSV files, use `e2-medium` or higher machine types to avoid OOM errors during processing.
 
 ---
 

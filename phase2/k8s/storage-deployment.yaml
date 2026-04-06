@@ -25,7 +25,7 @@ spec:
       serviceAccountName: ngsim-workload-sa
       containers:
         - name: storage
-          image: gcr.io/YOUR_PROJECT_ID/ngsim-storage:latest
+          image: REGION-docker.pkg.dev/YOUR_PROJECT_ID/ngsim/ngsim-storage:latest
           ports:
             - containerPort: 8004
           envFrom:
@@ -36,11 +36,11 @@ spec:
               mountPath: /data
           resources:
             requests:
-              cpu:    "250m"
-              memory: "512Mi"
+              cpu:    "50m"
+              memory: "64Mi"
             limits:
-              cpu:    "500m"
-              memory: "1Gi"
+              cpu:    "250m"
+              memory: "256Mi"
           livenessProbe:
             httpGet:
               path: /health

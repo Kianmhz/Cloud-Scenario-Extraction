@@ -27,5 +27,5 @@ data:
   REQUEST_TIMEOUT:         "600"
 
   # GCS configuration (update with your bucket name)
-  USE_GCS:    "true"
-  GCS_BUCKET: "your-gcs-bucket-name"
+  USE_GCS:    "false"
+  GCS_BUCKET: ""

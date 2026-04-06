@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
         - name: api-gateway
-          image: gcr.io/YOUR_PROJECT_ID/ngsim-gateway:latest
+          image: REGION-docker.pkg.dev/YOUR_PROJECT_ID/ngsim/ngsim-gateway:latest
           ports:
             - containerPort: 8000
           envFrom:
@@ -30,11 +30,11 @@ spec:
                 name: ngsim-config
           resources:
             requests:
+              cpu:    "50m"
+              memory: "128Mi"
+            limits:
               cpu:    "250m"
               memory: "256Mi"
-            limits:
-              cpu:    "500m"
-              memory: "512Mi"
           livenessProbe:
             httpGet:
               path: /health
